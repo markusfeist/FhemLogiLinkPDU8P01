@@ -2,7 +2,7 @@
 set -e # Exit with nonzero exit code if anything fails
 MY_PATH="`dirname \"$0\"`"
 MY_CWD=$(pwd)
-ENCRYPTION_LABEL=e1304e2fcacf
+ENCRYPTION_LABEL=a1bce9ed3c0f
 
 function doCompile {
     ./MakeUpd.sh
