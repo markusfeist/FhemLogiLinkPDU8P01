@@ -1,5 +1,0 @@
-list test
-list test1
-set test autocreate
-list test_0
-list test
