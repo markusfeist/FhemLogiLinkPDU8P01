@@ -17,8 +17,7 @@ sub LLPDU8P01_Initialize($) {
     $hash->{GetFn}    = "LLPDU8P01_Get";
     $hash->{AttrFn}   = "LLPDU8P01_Attr";
     $hash->{RenameFn} = "LLPDU8P01_Rename";
-    $hash->{AttrList} =
-      "expert:0,4 " . "stateFormat " . $readingFnAttributes;
+    $hash->{AttrList} = "expert:0,4 " . "stateFormat " . $readingFnAttributes;
     Log3 "LLPDU8P01", 5, "LLPDU8P01_Initialize finished.";
 }
 
@@ -226,6 +225,21 @@ sub LLPDU8P01_Set ($$@) {
             }
         }
     }
+    elsif ( $cmd eq "getConfig" ) {
+        my $hostname  = $hash->{"hostname"};
+        my $httpparam = {
+            url         => "http://$hostname/config_PDU.htm",
+            timeout     => 20,
+            httpversion => "1.1",
+            hash        => $hash,
+            method      => "GET",
+            user        => $hash->{".username"},
+            pwd         => $hash->{".password"},
+            callback    => \&LLPDU8P01_NonblockingGet_Callback_Config
+        };
+        HttpUtils_NonblockingGet($httpparam);
+        return undef;
+    }
     elsif ( defined( $hash->{chanNo} ) ) {
         return SetExtensions(
             $hash,
@@ -237,7 +251,7 @@ sub LLPDU8P01_Set ($$@) {
     }
     else {
         return
-"Unknown argument $cmd, choose one of clear:readings statusRequest:noArg on:multiple,0,1,2,3,4,5,6,7 off:multiple,0,1,2,3,4,5,6,7 onoff:multiple,0,1,2,3,4,5,6,7 autocreate:noArg";
+"Unknown argument $cmd, choose one of clear:readings statusRequest:noArg on:multiple,0,1,2,3,4,5,6,7 off:multiple,0,1,2,3,4,5,6,7 onoff:multiple,0,1,2,3,4,5,6,7 autocreate:noArg getConfig:noArg";
     }
 }
 
@@ -271,7 +285,7 @@ sub LLPDU8P01_SetSocketsState($$$@) {
     foreach (@outlets) {
         my $s = $_;
         Log3 $name, 5, "$name LLPDU8P01: SetSocketsState $value for $s";
-        readingsBulkUpdate( $hash, "outletStat$s", $value );
+        readingsBulkUpdate( $hash, "outlet${s}Stat", $value );
         my $channelHash = $hash->{"channel_$s"};
         $channelHash = $defs{$channelHash} if ( defined($channelHash) );
         readingsSingleUpdate( $channelHash, "state", $value, 1 )
@@ -305,6 +319,77 @@ sub LLPDU8P01_NonblockingGet_Callback_SetSockets($$$) {
     else {
         Log3 $name, 4, "$name LLPDU8P01: command execute successfully.";
     }
+    my $intervall = $hash->{"intervall"};
+    if ( $intervall == 0 ) {
+        Log3 $name, 3, "$name LLPDU8P01: No autmatic polling, call manual";
+        foreach ( grep( /^outlet.*Delay/, keys %{ $hash->{READINGS} } ) ) {
+            next if ( !$_ );
+            my $test = $hash->{READINGS}{$_}{VAL};
+            Log3 $name, 4, "$name LLPDU8P01: Scan $_ $test";
+            $intervall = $test if ( defined($test) && ( $test > $intervall ) );
+        }
+        $intervall = 20 if ( $intervall == 0 );
+        $intervall += 1;
+        Log3 $name, 4,
+          "$name LLPDU8P01: Statusrequest with intervall $intervall";
+        InternalTimer( gettimeofday() + $intervall,
+            "LLPDU8P01_CheckStatusTimer", $hash );
+    }
+}
+
+sub LLPDU8P01_NonblockingGet_Callback_Config($$$) {
+    my ( $param, $err, $data ) = @_;
+    my $hash = $param->{hash};
+    my $name = $hash->{NAME};
+    my $code = $param->{code};
+    Log3 $name, 4, "$name LLPDU8P01: Callback";
+    if ( $err ne "" ) {
+        Log3 $name, 1,
+            "$name LLPDU8P01: error while statusrequest to "
+          . $param->{url}
+          . " - $err";
+        readingsSingleUpdate( $hash, "state", "HTTP COMM ERROR $err", 1 );
+    }
+    elsif ( $code != 200 ) {
+        Log3 $name, 1,
+            "$name LLPDU8P01: http-error while statusrequest to "
+          . $param->{url} . " - "
+          . $param->{code};
+        Log3 $name, 3, "$name LLPDU8P01: http-header: " . $param->{httpheader};
+        Log3 $name, 3, "$name LLPDU8P01: http-data: " . $data;
+        readingsSingleUpdate( $hash, "state", "HTTP ERROR $code", 1 );
+    }
+    else {
+        Log3 $name, 5, "$name LLPDU8P01: getConfig successfull";
+        Log3 $name, 5, "$name LLPDU8P01: http-header: " . $param->{httpheader};
+        Log3 $name, 5, "$name LLPDU8P01: http-data: " . $data;
+        readingsBeginUpdate($hash);
+        for ( my $s = 0 ; $s < 8 ; $s++ ) {
+            my $channelHash = $hash->{"channel_$s"};
+            if ( defined($channelHash) ) {
+                $channelHash = $defs{$channelHash};
+                readingsBeginUpdate($channelHash);
+            }
+            if ( $data =~ /<input name="otlt$s" [^>]* value="([^"]*)"/ ) {
+                readingsBulkUpdate( $hash,        "outlet${s}Name", $1 );
+                readingsBulkUpdate( $channelHash, "outletName",     $1 )
+                  if ( defined($channelHash) );
+            }
+            if ( $data =~ /<input name="ondly$s" [^>]* value="([^"]*)"/ ) {
+                readingsBulkUpdate( $hash,        "outlet${s}OnDelay", $1 );
+                readingsBulkUpdate( $channelHash, "outletOnDelay",     $1 )
+                  if ( defined($channelHash) );
+            }
+            if ( $data =~ /<input name="ofdly$s" [^>]* value="([^"]*)"/ ) {
+                readingsBulkUpdate( $hash,        "outlet${s}OffDelay", $1 );
+                readingsBulkUpdate( $channelHash, "outletOffDelay",     $1 )
+                  if ( defined($channelHash) );
+            }
+            readingsEndUpdate( $channelHash, 1 ) if ( defined($channelHash) );
+        }
+        readingsEndUpdate( $hash, 1 );
+    }
+    HttpUtils_Close($param);
 }
 
 sub LLPDU8P01_CheckStatus($$) {
@@ -362,11 +447,12 @@ sub LLPDU8P01_NonblockingGet_Callback_Status($$$) {
         my $stateSocketsOff = "";
         for ( my $s = 0 ; $s < 8 ; $s++ ) {
             if ( $data =~ /<outletStat$s>([^<]*)<\/outletStat$s>/ ) {
-                readingsBulkUpdate( $hash, "outletStat$s", $1 );
+                readingsBulkUpdate( $hash, "outlet${s}Stat", $1 );
                 my $channelHash = $hash->{"channel_$s"};
-                $channelHash = $defs{$channelHash} if ( defined($channelHash) );
-                readingsSingleUpdate( $channelHash, "state", $1, 1 )
-                  if ( defined($channelHash) );
+                if ( defined($channelHash) ) {
+                    $channelHash = $defs{$channelHash};
+                    readingsSingleUpdate( $channelHash, "state", $1, 1 );
+                }
                 if ( $1 eq "on" ) {
                     $stateSocketsOn = $stateSocketsOn . "$s,";
                 }
@@ -438,7 +524,10 @@ sub LLPDU8P01_CheckStatusTimer($) {
     <li>humidity<br>Humidity measured</li>    
     <li>on<br>Sockets which are on</li>
     <li>off<br>Sockets which are off</li>
-    <li>outletStat0 - outletStat7<br>Status of outlet</li>
+    <li>outlet0Stat - outlet7Stat<br>Status of outlet</li>
+    <li>outlet0Name - outlet7Name<br>Name of outlet</li>
+    <li>outlet0OnDelay - outlet7OnDelay<br>On delay of outlet</li>
+    <li>outlet0OffDelay - outlet7OffDelay<br>Off delay of outlet</li>
     <li>temperature<br>Temperature measured</li>
     <li>state<br>Sockets which are on or last error</li>
     <li>stateDevice<br>Reported state of device</li>
@@ -463,6 +552,8 @@ sub LLPDU8P01_CheckStatusTimer($) {
     Sets a list of Sockets to off then on</li>        
     <li><code>set &lt;name&gt; statusRequest</code><a name="LLPDU8P01statusRequest"></a><br>
     Requests a status update</li>
+    <li><code>set &lt;name&gt; getConfig</code><a name="LLPDU8P01getConfig"></a><br>
+    Reads the configuration of the PDU</li>
   </ul>
   <br>
   <b>Set - Channel</b>
@@ -526,7 +617,10 @@ sub LLPDU8P01_CheckStatusTimer($) {
     <li>humidity<br>Gemessene Luftfeuchte</li>    
     <li>on<br>Angabe welche Steckdosen an sind.</li>
     <li>off<br>Angabe welche Steckdosen aus sind.</li>
-    <li>outletStat0 - outletStat7<br>Status der Steckdosen</li>
+    <li>outlet0Stat0 - outlet7Stat<br>Status der Steckdosen</li>
+    <li>outlet0Name - outlet7Name<br>Name der Steckdose</li>
+    <li>outlet0OnDelay - outlet7OnDelay<br>On delay der Steckdose</li>
+    <li>outlet0OffDelay - outlet7OffDelay<br>Off delay der Steckdose</li>
     <li>temperature<br>Gemessene Temperatur</li>
     <li>state<br>Angabe welche Steckdosen an sind, oder der letzte Fehler</li>
     <li>stateDevice<br>Status des Ger&auml;tes</li>
@@ -551,6 +645,8 @@ sub LLPDU8P01_CheckStatusTimer($) {
     Setzt eine Liste von Steckdosen auf aus und dann an</li>        
     <li><code>set &lt;name&gt; statusRequest</code><a name="LLPDU8P01statusRequest"></a><br>
     Holt eine Statusabfrage ab</li>
+    <li><code>set &lt;name&gt; getConfig</code><a name="LLPDU8P01getConfig"></a><br>
+    Liest die Konfiguration der PDU</li>
   </ul>
   <br>
   <b>Set - Kan&auml;le</b>
