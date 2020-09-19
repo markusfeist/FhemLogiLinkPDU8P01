@@ -6,7 +6,7 @@ FHEM Modul for LogiLink PDU8P01 und da vermutlich baugleich für die Intellinet 
 ### Modul
 Das Modul kann (solange es noch nicht im FHEM svn verteilt wird) mit
 ```
-update all https://markusfeist.github.io/FhemMobileAlerts/repository/master/controls_mobilealerts.txt
+update all https://markusfeist.github.io/FhemMobileAlerts/repository/master/controls_logilinkpdu8p01.txt
 ```
 beziehen.
 
