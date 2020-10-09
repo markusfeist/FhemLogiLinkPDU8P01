@@ -74,7 +74,7 @@ sub LLPDU8P01_Define($$) {
           if ( $intervall > 0 );
         $username = LLPDU8P01_encrypt($username);
         $password = LLPDU8P01_encrypt($password);
-        $hash->{DEF} = "$ip $username $password $intervall"
+        $hash->{DEF} = "$ip $intervall $username $password"
     }
     return undef;
 }
@@ -536,15 +536,15 @@ sub LLPDU8P01_decrypt($) {
   <a name="LLPDU8P01define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LLPDU8P01 &lt;IP/Hostname&gt; &lt;Pollintervall&gt; &lt;Username/File with Logindata&gt; &lt;opt. Password&gt;</code><br>
+    <code>define &lt;name&gt; LLPDU8P01 &lt;IP/Hostname&gt; &lt;Pollintervall&gt; &lt;Username&gt; &lt;Password&gt;</code><br>
     <br>
     IP/Hostname: IP/Hostname of the PDU8P01
     <br>
     Pollintervall: Intervall for polling State in Seconds
     <br>
-    Username: Username or alternativ a file where to get username and password
+    Username: Username
     <br>
-    Password optional: Password (if not defined username will be used as filename)
+    Password: Password
     <br>
     alternative:<br>
     <code>define &lt;name&gt; LLPDU8P01 &lt;_ParentName_Channel&gt;</code><br>
@@ -629,15 +629,15 @@ sub LLPDU8P01_decrypt($) {
   <a name="LLPDU8P01define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; LLPDU8P01 &lt;IP/Hostname&gt; &lt;Pollintervall&gt; &lt;Username/File with Logindata&gt; &lt;opt. Password&gt;</code><br>
+    <code>define &lt;name&gt; LLPDU8P01 &lt;IP/Hostname&gt; &lt;Pollintervall&gt; &lt;Username&gt; &lt;Password&gt;</code><br>
     <br>
     IP/Hostname: IP/Hostname der PDU8P01
     <br>
     Pollintervall: Intervall f&uuml;r das Polling in Sekunden
     <br>
-    Username: Username oder alternativ eine Datei aus der Username und Passwort abgeholt werden.
+    Username: Username
     <br>
-    Password optional: Passwort (wenn nicht gesetzt, wird der Username als Dateiname verwendet)
+    Password: Passwort
     <br>
     alternative:<br>
     <code>define &lt;name&gt; LLPDU8P01 &lt;_ParentName_Channel&gt;</code><br>
