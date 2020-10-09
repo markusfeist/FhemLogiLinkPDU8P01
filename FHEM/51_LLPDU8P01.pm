@@ -66,12 +66,15 @@ sub LLPDU8P01_Define($$) {
     else {
         $modules{LLPDU8P01}{defptr}{$name} = $hash;
         $hash->{"hostname"}                = $ip;
-        $hash->{".username"}               = $username;
-        $hash->{".password"}               = $password;
+        $hash->{".username"}               = LLPDU8P01_decrypt($username);
+        $hash->{".password"}               = LLPDU8P01_decrypt($password);
         $hash->{"intervall"}               = $intervall;
         InternalTimer( gettimeofday() + $intervall,
             "LLPDU8P01_CheckStatusTimer", $hash )
           if ( $intervall > 0 );
+        $username = LLPDU8P01_encrypt($username);
+        $password = LLPDU8P01_encrypt($password);
+        $hash->{DEF} = "$ip $username $password $intervall"
     }
     return undef;
 }
@@ -481,6 +484,37 @@ sub LLPDU8P01_CheckStatusTimer($) {
     InternalTimer( gettimeofday() + $intervall,
         "LLPDU8P01_CheckStatusTimer", $hash )
       if ( $intervall > 0 );
+}
+
+sub LLPDU8P01_encrypt($) {
+    my ($decoded) = @_;
+    my $key = getUniqueId();
+    my $encoded;
+
+    return $decoded if ( $decoded =~ /^crypt:(.*)/ );
+
+    for my $char ( split //, $decoded ) {
+        my $encode = chop($key);
+        $encoded .= sprintf( "%.2x", ord($char) ^ ord($encode) );
+        $key = $encode . $key;
+    }
+
+    return 'crypt:' . $encoded;
+}
+sub LLPDU8P01_decrypt($) {
+    my ($encoded) = @_;
+    my $key = getUniqueId();
+    my $decoded;
+
+    $encoded = $1 if ( $encoded =~ /^crypt:(.*)/ );
+
+    for my $char ( map { pack( 'C', hex($_) ) } ( $encoded =~ /(..)/g ) ) {
+        my $decode = chop($key);
+        $decoded .= chr( ord($char) ^ ord($decode) );
+        $key = $decode . $key;
+    }
+
+    return $decoded;
 }
 
 # Eval-Rückgabewert für erfolgreiches
