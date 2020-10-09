@@ -261,7 +261,7 @@ sub LLPDU8P01_Set ($$@) {
 sub LLPDU8P01_SetSockets($$$@) {
     my ( $hash, $name, $op, @outlets ) = @_;
     my $hostname = $hash->{"hostname"};
-    my $request;
+    my $request = "";
 
     foreach (@outlets) {
         $request = $request . "outlet$_=1&";
@@ -506,7 +506,8 @@ sub LLPDU8P01_decrypt($) {
     my $key = getUniqueId();
     my $decoded;
 
-    $encoded = $1 if ( $encoded =~ /^crypt:(.*)/ );
+    return $encoded if ( $encoded !~ /^crypt:(.*)/ );
+    $encoded = $1 ;
 
     for my $char ( map { pack( 'C', hex($_) ) } ( $encoded =~ /(..)/g ) ) {
         my $decode = chop($key);
