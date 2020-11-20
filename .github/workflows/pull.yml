@@ -5,8 +5,6 @@ name: CI
 # Controls when the action will run. 
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ master ]
   pull_request:
     branches: [ master ]
 
@@ -35,5 +33,5 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install fhem -y
       # Runs a single command using the runners shell
-      - name: Run a one-line script
+      - name: Run Test
         run: make test
