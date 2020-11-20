@@ -35,6 +35,14 @@ jobs:
       # Runs a single command using the runners shell
       - name: Run Test
         run: make test
+      - name: Build Package
+        run: |
+            mkdir public
+            mkdir public/FHEM
+            ./MakeUpd.sh
+            mv controls_logilinkpdu8p01.txt public/controls_logilinkpdu8p01.txt
+            cp CHANGED public/CHANGED
+            cp FHEM/* public/FHEM/.
       - name: Extract branch name
         shell: bash
         run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
