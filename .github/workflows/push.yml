@@ -35,14 +35,12 @@ jobs:
       # Runs a single command using the runners shell
       - name: Run Test
         run: make test
-      - name: Get Branch
-        run: |
-          raw=$(git branch -r --contains ${{ github.ref }})
-          branch=${raw/origin\/}
-          echo ::set-env name=BRANCH::$branch
-      - run: echo ${{ env.BRANCH }}
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch      
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          destination_dir: subdir/${{ env.BRANCH }}
+          destination_dir: subdir/${{ steps.extract_branch.outputs.branch }}
